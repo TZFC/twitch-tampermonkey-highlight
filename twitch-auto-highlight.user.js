@@ -2,7 +2,7 @@
 // @name                 Twitch Channel Points Auto-Highlight
 // @name:zh-CN           Twitch 自动频道点数醒目留言 (Ctrl+Enter)
 // @namespace            https://github.com/TZFC
-// @version              1.5.0
+// @version              1.5.1
 // @description          Press Ctrl+Enter (or Cmd+Enter on Mac) in Twitch chat to automatically spend Channel Points and send a highlighted message. Regular Enter still sends normal messages.
 // @description:zh-CN    在 Twitch 聊天框中按 Ctrl+Enter（Mac 上为 Cmd+Enter）自动使用频道积分发送醒目/高亮消息。常规 Enter 仍然发送普通消息。
 // @author               tianzifangchen
@@ -538,13 +538,24 @@
                 console.log('[Twitch Auto-Highlight] Step 6: Highlight redemption submitted!');
                 showToast('Highlighted message sent!', 'success');
 
-                // Clear any leftover duplicate text from the regular chatbox
-                await sleep(350);
-                const finalChatInput = getChatInputElement();
-                if (finalChatInput) {
-                    const leftover = getChatText(finalChatInput);
-                    if (leftover === messageText) {
-                        setChatText(finalChatInput, '');
+                // Clear any leftover duplicate text from the regular chatbox with retry polling
+                const cleanTarget = (messageText || '').trim().toLowerCase();
+                for (let cleanupAttempt = 0; cleanupAttempt < 6; cleanupAttempt++) {
+                    await sleep(150 + cleanupAttempt * 150);
+                    const finalChatInput = getChatInputElement();
+                    if (finalChatInput) {
+                        const leftover = getChatText(finalChatInput);
+                        const cleanLeftover = (leftover || '').trim().toLowerCase();
+                        if (cleanLeftover && (cleanTarget === cleanLeftover || cleanTarget.includes(cleanLeftover) || cleanLeftover.includes(cleanTarget))) {
+                            setChatText(finalChatInput, '');
+                            try {
+                                finalChatInput.focus();
+                                document.execCommand('selectAll', false, null);
+                                document.execCommand('delete', false, null);
+                            } catch (e) {}
+                        } else if (!cleanLeftover) {
+                            break; // Successfully cleared, no further attempts needed
+                        }
                     }
                 }
             } else {
